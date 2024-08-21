@@ -1,0 +1,228 @@
+---
+title: "Interactive Session 7"
+author: "Haylee Oyler"
+date: "2024-08-20"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(palmerpenguins)
+library(lubridate)
+```
+
+### Data Wrangling refresher
+
+```{r}
+penguins1 <- penguins %>% 
+  filter(island %in% c("Biscoe", "Dream")) %>% 
+  select(-c(year, sex)) %>% 
+  mutate(body_mass_kg = body_mass_g /1000) %>% 
+  rename(location = island)
+```
+
+```{r}
+penguins2 <- penguins %>% 
+   filter(!is.na(flipper_length_mm)) %>% 
+  group_by(sex) %>% 
+  summarise(mean = round(mean(flipper_length_mm), 2),
+            sd = round(sd(flipper_length_mm), 2),
+            n = n())
+```
+
+### Wrangling continued, joins of different flavors
+
+```{r}
+library(datapasta)
+animals <- tibble::tribble(
+             ~location,   ~species,  ~maturity,
+              "lagoon",   "bobcat",    "adult",
+               "bluff",   "coyote", "juvenile",
+               "creek",      "fox",    "adult",
+                "oaks", "squirrel", "juvenile",
+               "bluff",   "bobcat",    "adult"
+             )
+
+
+sites <- tibble::tribble(
+          ~location,      ~full_site_name, ~jurisdiction,
+            "beach",       "Goleta Beach",     "SB City",
+           "lagoon",        "UCSB Lagoon",        "UCSB",
+            "bluff",       "Ellwood Mesa",     "SB City",
+             "oaks", "Fremont Campground",        "USFS"
+          )
+
+```
+
+```{r}
+# Full join ---- Safest, nothing is excluded
+full_join_example <- full_join(animals, sites)
+
+# Left_join(x, y) keeps everything in x, and only joins from y (by matching key) if they have a match in x. otherwise dropped 
+left_join_example <- left_join(animals, sites)
+
+# opposite of left join
+right_join_example <- right_join(animals, sites)
+
+# Rows are only kept if the key matches in both x and y (intersection).
+inner_join_example <- inner_join(animals, sites)
+```
+
+#### Filtering joins
+```{r}
+# semi_join() “return[s] all rows from x with a match in y”
+# anti_join() “return[s] all rows from x without a match in y”
+
+semi_join_example <- semi_join(animals, sites)
+anti_join_example <- anti_join(animals, sites)
+```
+
+### Easier dates and times with Lubridate
+
+```{r}
+my_date <- "03-15-1998"
+lubridate::mdy(my_date)
+
+my_date <- "11/7/2003"
+lubridate::mdy(my_date)
+
+my_date <- "08-Jun-1974"
+lubridate::dmy(my_date)
+
+my_date <- "19610518"
+lubridate::ymd(my_date)
+```
+
+```{r}
+# NA 
+lubridate::mdy("1942-08-30")
+
+# incorrectly stored
+lubridate::dmy("09/12/84")
+```
+
+```{r}
+# Time zones ----
+time <- "2020-08-12 11:18"
+time <- ymd_hm(time)
+time # Note that the default is UTC
+
+class(time) # Class is POSIXct
+
+# Convert to PDT:
+with_tz(time, "America/Los_Angeles")
+
+# pull just the time
+my_time <- lubridate::ymd_hms(time)
+week(my_time) # can do, day, hour, second, year, minute, etc.
+
+# Get your system time
+comp_time <- Sys.time()
+
+# Convert comp_time to Europe/Belgrade time: 
+with_tz(comp_time, "Europe/Belgrade")
+```
+
+```{r}
+# Pulling pieces ----
+teddy_bday <- lubridate::ymd("20170615")
+
+# Return the date 
+teddy_bday
+
+# What day of the week? 
+wday(teddy_bday, label = TRUE)
+
+# Month
+month(teddy_bday)
+```
+
+```{r}
+# Data pieces as new columns ----
+urchin_counts <- tribble(
+  ~date, ~species, ~size_mm,
+  "10/3/2020", "purple", 55,
+  "10/4/2020", "red", 48,
+  "11/17/2020", "red", 67
+)
+
+urchin_counts_ymd <- urchin_counts %>% 
+  mutate(date = lubridate::mdy(date)) %>% 
+  mutate(year = year(date),
+         month = month(date),
+         day = day(date))
+
+urchin_counts_ymd
+
+# And then we could use group_by() to find different summary values by group, for example.
+day_1 <- lubridate::ymd("2020-01-06")
+day_2 <- lubridate::ymd("2020-05-18")
+day_3 <- lubridate::ymd("2020-05-19")
+
+# Create a time interval
+time_interval <- interval(day_1, day_2)
+
+# Check the length in weeks
+time_length(time_interval, "week")
+
+# Check the length in years
+time_length(time_interval, "year")
+```
+
+### Wrangling strings with stringr
+
+```{r}
+# use str_detect to detect a string pattern
+my_string <- "Teddy loves eating salmon and socks."
+
+# Does the pattern "love" exist within the string?
+my_string %>% str_detect("love")
+
+# Does the pattern "pup" exist within the string?
+my_string %>% str_detect("pup")
+
+my_string <- c("burrito", "fish taco", "Taco salad")
+
+# Does the vector element contain the pattern "fish"?
+my_string %>% str_detect("fish")
+```
+
+```{r}
+# if I only want names w skywalker...
+skywalkers <- starwars %>% 
+  filter(str_detect(name, "Skywalker"))
+
+skywalkers
+```
+
+```{r}
+# use str_replace to replace a string pattern with something else
+firewalkers <- starwars %>% 
+  mutate(name = str_replace(name, pattern = "Sky", replacement = "Fire"))
+
+head(firewalkers)
+```
+
+```{r}
+# Use str_trim() or str_squish() to remove excess white space
+feedback <- c(" I ate     some   nachos", "Wednesday morning   ")
+
+# Removes leading, trailing & duplicate interior whitespaces
+str_squish(feedback)
+
+# Removes leading & trailing whitespaces
+str_trim(feedback)
+```
+
+```{r}
+# Convert cases
+str_to_lower(feedback)
+str_to_upper(feedback)
+str_to_title(feedback)
+
+# Count matches in a string
+str_count(feedback, pattern = "nachos")
+```
+
